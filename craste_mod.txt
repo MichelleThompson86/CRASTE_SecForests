@@ -1,0 +1,103 @@
+
+    model{
+      # priors
+     
+       # abundance prioirs for covariate effect
+       b1 ~ dnorm(0, 0.1)
+       b2 ~ dnorm(0, 0.1)
+       b3 ~ dnorm(0, 0.1)
+       b4 ~ dnorm(0, 0.1)
+       b5 ~ dnorm(0, 0.1)
+       b6 ~ dnorm(0, 0.1)
+       b7 ~ dnorm(0, 0.1)
+       b8 ~ dnorm(0, 0.1)
+       b9 ~ dnorm(0, 0.1)
+       mean.lambda ~ dunif(0, 100)  #prioir on mean abundance
+       b0 <- log(mean.lambda)  #same but on log scale; intercept
+       
+       #detection prioirs for covariate effect
+       mean.p ~ dunif(0, 1) #prioir mean prob of detection
+       a0 <- logit(mean.p)  #intercept, same as above but logit scale
+       a1 ~ dnorm(0, 0.1)
+       a2 ~ dnorm(0, 0.1)
+       
+       
+       #### abundance 
+       sigma.site.lambda ~ dt(0, 1, 1) T(0, )    #sigma.site.p~dunif(0,10)
+       tau.site.lambda <- pow(sigma.site.lambda, -2)
+  
+      for(k in 1:n.site){
+       eta.site.lambda[k] ~ dnorm(0, tau.site.lambda) #site random intercept
+      }
+        
+      ##detection process 
+       sigma.p ~ dt(0, 1, 1) T(0, ) 
+       tau.p <- pow(sigma.p, -2) 
+     
+      for (i in 1:n.transect){
+      for(j in 1:n.survey){
+       eta.p[i, j] ~ dnorm(0, tau.p) #random effect for obs process for each survey
+       } 
+      }
+      
+
+      #likelihood
+      for(i in 1:n.transect){
+                N[i]~dpois(lambda[i])
+          
+       
+                log(lambda[i]) <- b0  + b1*stage1[i] + b2*stage2[i] +
+                          b3*stage3[i] + b4*stage4[i] + b5*habitat[i] + b6*stage1[i]*habitat[i] +
+                          b7*stage2[i]*habitat[i] + b8*stage3[i]*habitat[i] + b9*stage4[i]*habitat[i] +
+                          eta.site.lambda[site[i]]  # the nested effect of transect site
+        
+        
+    
+      
+      for (j in 1:n.survey) {
+               logit(p[i, j]) <- a0 + a1*time[j] + a2*season[j] + eta.p[i, j]  
+                
+         y[i, j] ~ dbin(p[i, j], N[i])
+
+
+        ## Compute fit statistic for observed data
+        eval[i,j] <- p[i,j] * N[i]  # expexted count at site, survey
+
+        #discrepancy  ##add 0.5 to avoid divide by zero
+        E[i,j] <- pow((y[i,j] - eval[i,j]), 2) / (eval[i, j] + 0.5) 
+
+        ## Generate replicate data and compute fit stats for them
+        y.new[i, j] ~ dbinom(p[i, j], N[i])
+        E.new[i, j] <- pow((y.new[i, j] - eval[i, j]), 2) / (eval[i, j]+0.5)
+
+        } #end survey loop
+      }   #end site loop
+
+
+
+      # derived parameters
+      fit <- sum(E[,])
+      fit.new <- sum(E.new[,])
+      c.hat <- fit / fit.new # c-hat estimate 
+      bpv <- step(fit.new-fit) 
+      bpval<-mean(bpv) # Bayesian p-value
+      test <- step(fit.new - fit)
+     
+
+      Ptotal <-sum(N[19:36])
+      OGtotal <-sum(N[1:18])
+      
+      PAv <-mean(N[19:36])
+      S1Av <- mean(N[79:88])
+      S2Av <-mean(c(N[43:60], N[73:78]))
+      S3Av <-mean(c(N[37:42], N[61:72]))
+      OGAv <-mean(N[1:18])
+
+
+      for (i in 1:n.transect) {
+      abund[i] <-N[i]
+      }
+    }
+    
+    
+ 
